@@ -176,7 +176,7 @@ func (p *Proxy) initDispatcher() error {
 
 func (p *Proxy) initFilters() {
 	for _, filter := range p.cfg.Filers {
-		f, err := newFilter(filter)
+		f, err := newFilter(filter, p.cfg)
 		if nil != err {
 			log.Fatalf("init filter failed, filter=<%+v> errors:\n%+v",
 				filter,

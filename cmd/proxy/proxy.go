@@ -48,9 +48,15 @@ var (
 	limitBufferWrite              = flag.Int("limit-buf-write", 1024, "Limit(bytes): Bytes for write buffer size")
 	limitBytesBodyMB              = flag.Int("limit-body", 10, "Limit(MB): MB for body size")
 	ttlProxy                      = flag.Int64("ttl-proxy", 10, "TTL(secs): proxy")
+
+	sadshuJwtSecret       = flag.String("jwt-secret", "123456", "Jwt: sadshu jwt secret")
+	sadshuJwtTokenLookup  = flag.String("jwt-token-loopup", "header:Authorization", "Jwt: sadshu jwt token lookup")
+	sadshuJwtAuthSchema   = flag.String("jwt-auth-schema", "Bearer", "Jwt: sadshu auth schema")
+	sadshuJwtHeaderPrefix = flag.String("jwt-header-prefix", "jwt_", "Jwt: sadshu header prefix for parsed")
 )
 
 func init() {
+	defaultFilters.Set(proxy.FilterSadashuJWT)
 	defaultFilters.Set(proxy.FilterWhiteList)
 	defaultFilters.Set(proxy.FilterBlackList)
 	defaultFilters.Set(proxy.FilterAnalysis)
@@ -141,5 +147,9 @@ func getCfg() *proxy.Cfg {
 		cfg.AddFilter(filter)
 	}
 
+	cfg.Sadashu.JwtSecret = *sadshuJwtSecret
+	cfg.Sadashu.JwtTokenLookup = *sadshuJwtTokenLookup
+	cfg.Sadashu.JwtAuthSchema = *sadshuJwtAuthSchema
+	cfg.Sadashu.JwtHeaderPrefix = *sadshuJwtHeaderPrefix
 	return cfg
 }

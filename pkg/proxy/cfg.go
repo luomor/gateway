@@ -31,6 +31,7 @@ type Cfg struct {
 	Namespace string
 	TTLProxy  int64
 	Filers    []*FilterSpec
+	Sadashu   SadashuCfg
 
 	Option *Option
 }

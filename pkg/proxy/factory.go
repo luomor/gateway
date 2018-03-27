@@ -32,9 +32,11 @@ const (
 	FilterCircuitBreake = "CIRCUIT-BREAKER"
 	// FilterValidation validation request filter
 	FilterValidation = "VALIDATION"
+	// FilterSadashuJWT jwt filter
+	FilterSadashuJWT = "JWT"
 )
 
-func newFilter(filterSpec *FilterSpec) (filter.Filter, error) {
+func newFilter(filterSpec *FilterSpec, cfg *Cfg) (filter.Filter, error) {
 	if filterSpec.External {
 		return newExternalFilter(filterSpec)
 	}
@@ -60,6 +62,8 @@ func newFilter(filterSpec *FilterSpec) (filter.Filter, error) {
 		return newCircuitBreakeFilter(), nil
 	case FilterValidation:
 		return newValidationFilter(), nil
+	case FilterSadashuJWT:
+		return newSadashuJWTFilter(cfg.Sadashu), nil
 	default:
 		return nil, ErrUnknownFilter
 	}
