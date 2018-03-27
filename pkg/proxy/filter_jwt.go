@@ -3,7 +3,6 @@ package proxy
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -43,16 +42,6 @@ func newSadashuJWTFilter(cfg SadashuCfg) filter.Filter {
 
 // Init init filter
 func (f *JWTFilter) Init(cfg string) error {
-	data, err := ioutil.ReadFile(cfg)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(data, &f.cfg)
-	if err != nil {
-		return err
-	}
-
 	// Initialize
 	parts := strings.Split(f.cfg.JwtTokenLookup, ":")
 	f.getter = jwtFromHeader(parts[1], f.cfg.JwtAuthSchema)

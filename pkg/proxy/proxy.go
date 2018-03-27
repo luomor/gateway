@@ -178,7 +178,7 @@ func (p *Proxy) initFilters() {
 	for _, filter := range p.cfg.Filers {
 		f, err := newFilter(filter, p.cfg)
 		if nil != err {
-			log.Fatalf("init filter failed, filter=<%+v> errors:\n%+v",
+			log.Fatalf("new filter failed, filter=<%+v> errors:\n%+v",
 				filter,
 				err)
 		}
