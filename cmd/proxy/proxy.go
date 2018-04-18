@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fagongzi/gateway/pkg/proxy"
+	"github.com/fagongzi/gateway/pkg/util"
 	"github.com/fagongzi/log"
 )
 
@@ -53,6 +54,7 @@ var (
 	sadshuJwtTokenLookup  = flag.String("jwt-token-loopup", "header:Authorization", "Jwt: sadshu jwt token lookup")
 	sadshuJwtAuthSchema   = flag.String("jwt-auth-schema", "Bearer", "Jwt: sadshu auth schema")
 	sadshuJwtHeaderPrefix = flag.String("jwt-header-prefix", "jwt_", "Jwt: sadshu header prefix for parsed")
+	version               = flag.Bool("version", false, "Show version info")
 )
 
 func init() {
@@ -71,6 +73,10 @@ func init() {
 func main() {
 	flag.Var(filters, "filter", "Plugin(Filter): format is <filter name>[:plugin file path][:plugin config file path]")
 	flag.Parse()
+
+	if *version && util.PrintVersion() {
+		os.Exit(0)
+	}
 
 	log.InitLog()
 	runtime.GOMAXPROCS(runtime.NumCPU())
