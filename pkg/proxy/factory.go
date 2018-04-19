@@ -32,11 +32,13 @@ const (
 	FilterCircuitBreake = "CIRCUIT-BREAKER"
 	// FilterValidation validation request filter
 	FilterValidation = "VALIDATION"
+	// FilterCaching access log filter
+	FilterCaching = "CACHING"
 	// FilterSadashuJWT jwt filter
 	FilterSadashuJWT = "JWT"
 )
 
-func newFilter(filterSpec *FilterSpec, cfg *Cfg) (filter.Filter, error) {
+func (p *Proxy) newFilter(filterSpec *FilterSpec) (filter.Filter, error) {
 	if filterSpec.External {
 		return newExternalFilter(filterSpec)
 	}
@@ -63,7 +65,9 @@ func newFilter(filterSpec *FilterSpec, cfg *Cfg) (filter.Filter, error) {
 	case FilterValidation:
 		return newValidationFilter(), nil
 	case FilterSadashuJWT:
-		return newSadashuJWTFilter(cfg.Sadashu), nil
+		return newSadashuJWTFilter(p.cfg.Sadashu), nil
+	case FilterCaching:
+		return newCachingFilter(p.cfg.Option.LimitBytesCaching, p.dispatcher.tw), nil
 	default:
 		return nil, ErrUnknownFilter
 	}
