@@ -35,12 +35,14 @@ func (req *copyReq) needRewrite() bool {
 }
 
 func (req *copyReq) rewiteURL() string {
-	return req.api.rewriteURL(req.origin, req.node.meta.URLRewrite)
+	return req.api.rewriteURL(req.origin, req.node, nil)
 }
 
 type dispathNode struct {
-	ctx *fasthttp.RequestCtx
-	wg  *sync.WaitGroup
+	rd       *render
+	ctx      *fasthttp.RequestCtx
+	multiCtx *multiContext
+	wg       *sync.WaitGroup
 
 	api                  *apiRuntime
 	node                 *apiNode
@@ -50,6 +52,19 @@ type dispathNode struct {
 	cachedBody, cachedCT []byte
 	err                  error
 	code                 int
+}
+
+func (dn *dispathNode) reset() {
+	*dn = emptyDispathNode
+}
+
+func (dn *dispathNode) hasError() bool {
+	return dn.err != nil ||
+		dn.code >= fasthttp.StatusBadRequest
+}
+
+func (dn *dispathNode) hasDefaultValue() bool {
+	return dn.node.meta.DefaultValue != nil
 }
 
 func (dn *dispathNode) release() {
@@ -63,7 +78,7 @@ func (dn *dispathNode) needRewrite() bool {
 }
 
 func (dn *dispathNode) rewiteURL(req *fasthttp.Request) string {
-	return dn.api.rewriteURL(req, dn.node.meta.URLRewrite)
+	return dn.api.rewriteURL(req, dn.node, dn.multiCtx)
 }
 
 func (dn *dispathNode) getResponseContentType() []byte {
@@ -79,6 +94,18 @@ func (dn *dispathNode) getResponseContentType() []byte {
 }
 
 func (dn *dispathNode) copyHeaderTo(ctx *fasthttp.RequestCtx) {
+	if dn.node.meta.UseDefault ||
+		(dn.hasError() && dn.hasDefaultValue()) {
+		for _, hd := range dn.node.meta.DefaultValue.Headers {
+			(&ctx.Response.Header).Add(hd.Name, hd.Value)
+		}
+
+		for _, ck := range dn.node.defaultCookies {
+			(&ctx.Response.Header).SetCookie(ck)
+		}
+		return
+	}
+
 	if dn.res != nil {
 		for _, h := range MultiResultsRemoveHeaders {
 			dn.res.Header.Del(h)
@@ -88,6 +115,11 @@ func (dn *dispathNode) copyHeaderTo(ctx *fasthttp.RequestCtx) {
 }
 
 func (dn *dispathNode) getResponseBody() []byte {
+	if dn.node.meta.UseDefault ||
+		(dn.hasError() && dn.hasDefaultValue()) {
+		return dn.node.meta.DefaultValue.Body
+	}
+
 	if len(dn.cachedBody) > 0 {
 		return dn.cachedBody
 	}
@@ -101,7 +133,8 @@ func (dn *dispathNode) getResponseBody() []byte {
 
 func (dn *dispathNode) maybeDone() {
 	if nil != dn.wg {
-		defer dn.wg.Done()
+		dn.multiCtx.completePart(dn.node.meta.AttrName, dn.getResponseBody())
+		dn.wg.Done()
 	}
 }
 
@@ -149,20 +182,27 @@ func newDispatcher(cnf *Cfg, db store.Store, runner *task.Runner) *dispatcher {
 	return rt
 }
 
-func (r *dispatcher) dispatch(req *fasthttp.Request) ([]*dispathNode, *metapb.RenderTemplate) {
+func (r *dispatcher) dispatchCompleted() {
+	r.RUnlock()
+}
+
+func (r *dispatcher) dispatch(req *fasthttp.Request) (*apiRuntime, []*dispathNode) {
 	r.RLock()
 
-	var template *metapb.RenderTemplate
+	var targetAPI *apiRuntime
 	var dispathes []*dispathNode
 	for _, api := range r.apis {
 		if api.matches(req) {
-			template = api.meta.RenderTemplate
+			targetAPI = api
+			if api.meta.UseDefault {
+				break
+			}
+
 			for _, node := range api.nodes {
-				dn := &dispathNode{
-					api:  api,
-					node: node,
-					dest: r.selectServer(req, r.clusters[node.meta.ClusterID]),
-				}
+				dn := acquireDispathNode()
+				dn.api = api
+				dn.node = node
+				dn.dest = r.selectServer(req, r.clusters[node.meta.ClusterID])
 
 				r.routingOpt(api.meta.ID, req, dn)
 				dispathes = append(dispathes, dn)
@@ -171,8 +211,7 @@ func (r *dispatcher) dispatch(req *fasthttp.Request) ([]*dispathNode, *metapb.Re
 		}
 	}
 
-	r.RUnlock()
-	return dispathes, template
+	return targetAPI, dispathes
 }
 
 func (r *dispatcher) routingOpt(apiID uint64, req *fasthttp.Request, node *dispathNode) {
