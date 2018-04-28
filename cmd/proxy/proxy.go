@@ -52,6 +52,7 @@ var (
 	limitBytesCachingMB           = flag.Uint64("limit-caching", 64, "Limit(MB): MB for caching size")
 	ttlProxy                      = flag.Int64("ttl-proxy", 10, "TTL(secs): proxy")
 
+	sadshuJwtRedis        = flag.String("jwt-redis", "127.0.0.1", "Jwt: sadshu jwt redis")
 	sadshuJwtSecret       = flag.String("jwt-secret", "123456", "Jwt: sadshu jwt secret")
 	sadshuJwtTokenLookup  = flag.String("jwt-token-loopup", "header:Authorization", "Jwt: sadshu jwt token lookup")
 	sadshuJwtAuthSchema   = flag.String("jwt-auth-schema", "Bearer", "Jwt: sadshu auth schema")
@@ -166,5 +167,6 @@ func getCfg() *proxy.Cfg {
 	cfg.Sadashu.JwtTokenLookup = *sadshuJwtTokenLookup
 	cfg.Sadashu.JwtAuthSchema = *sadshuJwtAuthSchema
 	cfg.Sadashu.JwtHeaderPrefix = *sadshuJwtHeaderPrefix
+	cfg.Sadashu.JwtRedis = *sadshuJwtRedis
 	return cfg
 }

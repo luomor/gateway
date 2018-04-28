@@ -6,4 +6,5 @@ type SadashuCfg struct {
 	JwtTokenLookup  string
 	JwtAuthSchema   string
 	JwtHeaderPrefix string
+	JwtRedis        string
 }

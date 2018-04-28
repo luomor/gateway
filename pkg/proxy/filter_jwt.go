@@ -4,14 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/fagongzi/gateway/pkg/filter"
+	"github.com/garyburd/redigo/redis"
 	"github.com/valyala/fasthttp"
+)
+
+const (
+	prefixJWT = "passport_jwt_"
 )
 
 var (
 	errJWTMissing = errors.New("missing jwt token")
+	errJWTInvalid = errors.New("invalid jwt token")
 )
 
 type tokenGetter func(filter.Context) (string, error)
@@ -32,11 +39,22 @@ type JWTFilter struct {
 	cfg         SadashuCfg
 	secretBytes []byte
 	getter      tokenGetter
+	redisPool   *redis.Pool
 }
 
 func newSadashuJWTFilter(cfg SadashuCfg) filter.Filter {
 	return &JWTFilter{
 		cfg: cfg,
+		redisPool: &redis.Pool{
+			MaxActive:   100,
+			MaxIdle:     10,
+			IdleTimeout: time.Second * 60 * 10,
+			Dial: func() (redis.Conn, error) {
+				return redis.Dial("tcp",
+					cfg.JwtRedis,
+					redis.DialWriteTimeout(time.Second*10))
+			},
+		},
 	}
 }
 
@@ -77,16 +95,15 @@ func (f *JWTFilter) Pre(c filter.Context) (statusCode int, err error) {
 		return fasthttp.StatusForbidden, err
 	}
 
+	if f.getJWTToken(claims) != token {
+		return fasthttp.StatusForbidden, errJWTInvalid
+	}
+
 	for key, value := range claims {
 		c.ForwardRequest().Header.Add(fmt.Sprintf("%s%s", f.cfg.JwtHeaderPrefix, key), fmt.Sprintf("%v", value))
 	}
 
 	return f.BaseFilter.Pre(c)
-}
-
-// Post execute after proxy
-func (f *JWTFilter) Post(c filter.Context) (statusCode int, err error) {
-	return f.BaseFilter.Post(c)
 }
 
 func (f *JWTFilter) parseJWTToken(tokenString string) (jwt.MapClaims, error) {
@@ -140,4 +157,26 @@ func jwtFromCookie(name string) tokenGetter {
 		}
 		return value, nil
 	}
+}
+
+func (f *JWTFilter) getJWTToken(m jwt.MapClaims) string {
+	conn := f.getRedis()
+	value, err := redis.String(conn.Do("GET",
+		f.getJWTKey(m["name"].(string),
+			int(m["source"].(float64)))))
+	conn.Close()
+
+	if err != nil {
+		return ""
+	}
+
+	return value
+}
+
+func (f *JWTFilter) getRedis() redis.Conn {
+	return f.redisPool.Get()
+}
+
+func (f *JWTFilter) getJWTKey(name string, source int) string {
+	return fmt.Sprintf("%s%s_%d", prefixJWT, name, source)
 }
