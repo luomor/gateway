@@ -8,12 +8,16 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/fagongzi/gateway/pkg/filter"
+	"github.com/fagongzi/log"
+	"github.com/fagongzi/util/format"
+	"github.com/fagongzi/util/hack"
 	"github.com/garyburd/redigo/redis"
 	"github.com/valyala/fasthttp"
 )
 
 const (
-	prefixJWT = "passport_jwt_"
+	prefixJWT    = "passport_jwt_"
+	jwtTTLHeader = "sadashu_jwt_ttl"
 )
 
 var (
@@ -99,6 +103,16 @@ func (f *JWTFilter) Pre(c filter.Context) (statusCode int, err error) {
 		return fasthttp.StatusForbidden, errJWTInvalid
 	}
 
+	ttl := f.cfg.JwtTTL
+	headerTTL := c.OriginRequest().Request.Header.Peek(jwtTTLHeader)
+	if len(headerTTL) > 0 {
+		value, err := format.ParseStrInt(hack.SliceToString(headerTTL))
+		if err == nil {
+			ttl = value
+		}
+	}
+	f.putJWTToken(claims, ttl, token)
+
 	for key, value := range claims {
 		c.ForwardRequest().Header.Add(fmt.Sprintf("%s%s", f.cfg.JwtHeaderPrefix, key), fmt.Sprintf("%v", value))
 	}
@@ -161,9 +175,9 @@ func jwtFromCookie(name string) tokenGetter {
 
 func (f *JWTFilter) getJWTToken(m jwt.MapClaims) string {
 	conn := f.getRedis()
-	value, err := redis.String(conn.Do("GET",
-		f.getJWTKey(m["name"].(string),
-			int(m["source"].(float64)))))
+	key := f.getJWTKey(m["name"].(string), int(m["source"].(float64)))
+
+	value, err := redis.String(conn.Do("GET", key))
 	conn.Close()
 
 	if err != nil {
@@ -171,6 +185,20 @@ func (f *JWTFilter) getJWTToken(m jwt.MapClaims) string {
 	}
 
 	return value
+}
+
+func (f *JWTFilter) putJWTToken(m jwt.MapClaims, ttl int, token string) {
+	key := f.getJWTKey(m["name"].(string), int(m["source"].(float64)))
+
+	conn := f.getRedis()
+	defer conn.Close()
+
+	_, err := conn.Do("SETEX", key, ttl, token)
+	if err != nil {
+		log.Errorf("[filter-jwt]: put jwt token %s failed, errors:%+v",
+			token,
+			err)
+	}
 }
 
 func (f *JWTFilter) getRedis() redis.Conn {
