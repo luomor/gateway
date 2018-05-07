@@ -52,8 +52,8 @@ func (rd *render) render(ctx *fasthttp.RequestCtx, multiCtx *multiContext) {
 func (rd *render) renderSingle(ctx *fasthttp.RequestCtx) {
 	dn := rd.nodes[0]
 
-	if dn.code > 0 {
-		ctx.SetStatusCode(dn.code)
+	if dn.res != nil {
+		ctx.SetStatusCode(dn.res.StatusCode())
 	}
 
 	if dn.err != nil ||
