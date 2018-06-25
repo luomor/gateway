@@ -272,7 +272,7 @@ func (p *Proxy) ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	num := len(dispatches)
 
 	if num > 1 {
-		wg = &sync.WaitGroup{}
+		wg = acquireWG()
 		multiCtx = acquireMultiContext()
 		multiCtx.init()
 	}
@@ -315,6 +315,7 @@ func (p *Proxy) ReverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	// wait last batch complete
 	if wg != nil {
 		wg.Wait()
+		releaseWG(wg)
 	}
 
 	rd.render(ctx, multiCtx)
@@ -411,11 +412,11 @@ func (p *Proxy) doProxy(dn *dispathNode) {
 	}
 
 	// hit cache
-	if value := c.GetAttr(cacheHit); nil != value {
+	if value := c.GetAttr(filter.UsingCachingValue); nil != value {
 		if log.DebugEnabled() {
 			log.Debugf("dispatch: hit cahce for %s", hack.SliceToString(forwardReq.RequestURI()))
 		}
-		dn.cachedCT, dn.cachedBody = parseCachedValue(value.([]byte))
+		dn.cachedCT, dn.cachedBody = filter.ParseCachedValue(value.([]byte))
 		dn.maybeDone()
 		releaseContext(c)
 		return

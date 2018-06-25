@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/fagongzi/gateway/pkg/pb/metapb"
@@ -128,6 +129,10 @@ func (r *dispatcher) loadAPIs() {
 			err)
 		return
 	}
+
+	r.Lock()
+	r.sortAPIs()
+	r.Unlock()
 }
 
 func (r *dispatcher) watch() {
@@ -318,6 +323,8 @@ func (r *dispatcher) addAPI(api *metapb.API) error {
 	}
 
 	r.apis[api.ID] = newAPIRuntime(api)
+	r.sortAPIs()
+
 	log.Infof("api <%d> added, data <%s>",
 		api.ID,
 		api.String())
@@ -335,6 +342,7 @@ func (r *dispatcher) updateAPI(api *metapb.API) error {
 	}
 
 	rt.updateMeta(api)
+	r.sortAPIs()
 	log.Infof("api <%d> updated, data <%s>",
 		api.ID,
 		api.String())
@@ -351,9 +359,46 @@ func (r *dispatcher) removeAPI(id uint64) error {
 	}
 
 	delete(r.apis, id)
-	log.Infof("api <%d> removed",
-		id)
+	// delete sorted keys
+	for i, v := range r.apiSortedKeys {
+		if v == id {
+			r.apiSortedKeys = append(r.apiSortedKeys[:i], r.apiSortedKeys[i+1:]...)
+			break
+		}
+	}
+	log.Infof("api <%d> removed", id)
+
 	return nil
+}
+
+// NOTE: MUST Lock on call this function!!
+func (r *dispatcher) sortAPIs() {
+	if len(r.apis) == 0 {
+		return
+	}
+
+	type kv struct {
+		Key   uint64
+		Value uint32
+	}
+
+	ss := make([]kv, len(r.apis))
+
+	var i = 0
+	for k, v := range r.apis {
+		ss[i] = kv{k, v.position()}
+		i++
+	}
+
+	// position升序
+	sort.SliceStable(ss, func(i, j int) bool {
+		return ss[i].Value < ss[j].Value
+	})
+
+	r.apiSortedKeys = make([]uint64, len(ss))
+	for i, v := range ss {
+		r.apiSortedKeys[i] = v.Key
+	}
 }
 
 func (r *dispatcher) refreshAllQPS() {
@@ -402,13 +447,11 @@ func (r *dispatcher) updateServer(meta *metapb.Server) error {
 	}
 
 	r.refreshQPS(meta)
-
 	rt.updateMeta(meta)
-
 	r.addAnalysis(rt)
 	r.addToCheck(rt)
 
-	log.Infof("server <%s> updated, data <%s>",
+	log.Infof("server <%d> updated, data <%s>",
 		meta.ID,
 		meta.String())
 
@@ -503,7 +546,7 @@ func (r *dispatcher) addBind(bind *metapb.Bind) error {
 
 	server, ok := r.servers[bind.ServerID]
 	if !ok {
-		log.Warnf("bind failed, server <%s> not found",
+		log.Warnf("bind failed, server <%d> not found",
 			bind.ServerID)
 		return errServerNotFound
 	}
