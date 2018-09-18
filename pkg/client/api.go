@@ -62,6 +62,12 @@ func (ab *APIBuilder) RemovePerm(perm string) *APIBuilder {
 	return ab
 }
 
+// WebSocketOptions set websocket options
+func (ab *APIBuilder) WebSocketOptions(options *metapb.WebSocketOptions) *APIBuilder {
+	ab.value.WebSocketOptions = options
+	return ab
+}
+
 // MatchURLPattern set a match path
 func (ab *APIBuilder) MatchURLPattern(urlPattern string) *APIBuilder {
 	ab.value.URLPattern = urlPattern
@@ -242,6 +248,48 @@ func (ab *APIBuilder) AddDispatchNode(cluster uint64) *APIBuilder {
 	ab.value.Nodes = append(ab.value.Nodes, &metapb.DispatchNode{
 		ClusterID: cluster,
 	})
+
+	return ab
+}
+
+// DispatchNodeTimeouts add timeouts options
+func (ab *APIBuilder) DispatchNodeTimeouts(cluster uint64, readTimeout, writeTimeout int64) *APIBuilder {
+	return ab.DispatchNodeTimeoutsWithIndex(cluster, 0, readTimeout, writeTimeout)
+}
+
+// DispatchNodeTimeoutsWithIndex add timeouts options
+func (ab *APIBuilder) DispatchNodeTimeoutsWithIndex(cluster uint64, idx int, readTimeout, writeTimeout int64) *APIBuilder {
+	node := ab.getNode(cluster, idx)
+	if nil == node {
+		ab.value.Nodes = append(ab.value.Nodes, &metapb.DispatchNode{
+			ClusterID:    cluster,
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
+		})
+	} else {
+		node.ReadTimeout = readTimeout
+		node.WriteTimeout = writeTimeout
+	}
+
+	return ab
+}
+
+// DispatchNodeRetryStrategy add a retryStrategy
+func (ab *APIBuilder) DispatchNodeRetryStrategy(cluster uint64, strategy *metapb.RetryStrategy) *APIBuilder {
+	return ab.DispatchNodeRetryStrategyWithIndex(cluster, 0, strategy)
+}
+
+// DispatchNodeRetryStrategyWithIndex add a retryStrategy
+func (ab *APIBuilder) DispatchNodeRetryStrategyWithIndex(cluster uint64, idx int, strategy *metapb.RetryStrategy) *APIBuilder {
+	node := ab.getNode(cluster, idx)
+	if nil == node {
+		ab.value.Nodes = append(ab.value.Nodes, &metapb.DispatchNode{
+			ClusterID:     cluster,
+			RetryStrategy: strategy,
+		})
+	} else {
+		node.RetryStrategy = strategy
+	}
 
 	return ab
 }
@@ -595,6 +643,33 @@ func (ab *APIBuilder) addRenderObject(nameInTemplate string, flatAttrs bool, nam
 		})
 	}
 
+	return ab
+}
+
+// AddTag add tag for api
+func (ab *APIBuilder) AddTag(key, value string) *APIBuilder {
+	ab.value.Tags = append(ab.value.Tags, &metapb.PairValue{
+		Name:  key,
+		Value: value,
+	})
+	return ab
+}
+
+// RemoveTag remove tag for api
+func (ab *APIBuilder) RemoveTag(key string) *APIBuilder {
+	var newTags []*metapb.PairValue
+	for _, tag := range ab.value.Tags {
+		if tag.Name != key {
+			newTags = append(newTags, tag)
+		}
+	}
+	ab.value.Tags = newTags
+	return ab
+}
+
+// Position reset the position for api
+func (ab *APIBuilder) Position(value uint32) *APIBuilder {
+	ab.value.Position = value
 	return ab
 }
 

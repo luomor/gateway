@@ -52,6 +52,18 @@ var (
 	limitBytesCachingMB           = flag.Uint64("limit-caching", 64, "Limit(MB): MB for caching size")
 	ttlProxy                      = flag.Int64("ttl-proxy", 10, "TTL(secs): proxy")
 	version                       = flag.Bool("version", false, "Show version info")
+
+	// internal plugin configuration file
+	jwtCfg = flag.String("jwt", "", "PLugin(JWT): jwt plugin configuration file, json format")
+
+	// metric
+	metricJob          = flag.String("metric-job", "", "prometheus job name")
+	metricInstance     = flag.String("metric-instance", "", "prometheus instance name")
+	metricAddress      = flag.String("metric-address", "", "prometheus proxy address")
+	metricIntervalSync = flag.Uint64("interval-metric-sync", 0, "Interval(sec): metric sync")
+
+	// enable features
+	enableWebSocket = flag.Bool("websocket", false, "enable websocket")
 )
 
 func init() {
@@ -120,6 +132,7 @@ func waitStop(p *proxy.Proxy) {
 func getCfg() *proxy.Cfg {
 	cfg := &proxy.Cfg{
 		Option: &proxy.Option{},
+		Metric: util.NewMetricCfg(*metricJob, *metricInstance, *metricAddress, time.Second*time.Duration(*metricIntervalSync)),
 	}
 
 	cfg.Addr = *addr
@@ -141,6 +154,8 @@ func getCfg() *proxy.Cfg {
 	cfg.Option.LimitTimeoutRead = time.Second * time.Duration(*limitTimeoutReadSec)
 	cfg.Option.LimitTimeoutWrite = time.Second * time.Duration(*limitTimeoutWriteSec)
 	cfg.Option.LimitIntervalHeathCheck = time.Second * time.Duration(*limitIntervalHeathCheckSec)
+	cfg.Option.JWTCfgFile = *jwtCfg
+	cfg.Option.EnableWebSocket = *enableWebSocket
 
 	specs := defaultFilters
 	if len(*filters) > 0 {

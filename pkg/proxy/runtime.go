@@ -15,6 +15,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/fagongzi/gateway/pkg/lb"
 	"github.com/fagongzi/gateway/pkg/pb/metapb"
+	"github.com/fagongzi/gateway/pkg/util"
 	"github.com/fagongzi/goetty"
 	"github.com/fagongzi/log"
 	"github.com/fagongzi/util/collection"
@@ -79,8 +80,7 @@ func (c *clusterRuntime) selectServer(req *fasthttp.Request) uint64 {
 		return 0
 	}
 
-	id, _ := e.Value.(uint64)
-	return id
+	return e.Value.(uint64)
 }
 
 type serverRuntime struct {
@@ -218,6 +218,7 @@ type apiRule struct {
 }
 
 type apiNode struct {
+	httpOption        util.HTTPOption
 	meta              *metapb.DispatchNode
 	validations       []*apiValidation
 	defaultCookies    []*fasthttp.Cookie
@@ -259,6 +260,14 @@ func newAPINode(meta *metapb.DispatchNode) *apiNode {
 		}
 
 		rn.validations = append(rn.validations, rv)
+	}
+
+	rn.httpOption = *globalHTTPOptions
+	if meta.ReadTimeout > 0 {
+		rn.httpOption.ReadTimeout = time.Second * time.Duration(meta.ReadTimeout)
+	}
+	if meta.WriteTimeout > 0 {
+		rn.httpOption.WriteTimeout = time.Second * time.Duration(meta.WriteTimeout)
 	}
 
 	return rn
@@ -388,6 +397,14 @@ func (a *apiRuntime) init() {
 	}
 
 	return
+}
+
+func (a *apiRuntime) isWebSocket() bool {
+	return a.meta.WebSocketOptions != nil
+}
+
+func (a *apiRuntime) webSocketOptions() *metapb.WebSocketOptions {
+	return a.meta.WebSocketOptions
 }
 
 func (a *apiRuntime) hasRenderTemplate() bool {

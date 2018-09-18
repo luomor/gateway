@@ -12,7 +12,11 @@ DIST_DIR 	= $(ROOT_DIR)dist/
 ETCD_VER			= v3.0.14
 ETCD_DOWNLOAD_URL	= https://github.com/coreos/etcd/releases/download
 
-DOCKER_TAG = $(shell date +%Y%m%d%H%M)
+DOCKER_TAG			:= $(tag)
+
+ifeq ("$(DOCKER_TAG)","")
+	DOCKER_TAG		:= $(shell date +%Y%m%d%H%M)
+endif
 
 .PHONY: release
 release: dist_dir apiserver proxy;
@@ -53,7 +57,6 @@ dist_dir: ; $(info ======== prepare distribute dir:)
 .PHONY: clean
 clean: ; $(info ======== clean all:)
 	rm -rf $(DIST_DIR)*
-	rm -rf $(ROOT_DIR)Library
 
 .PHONY: help
 help:

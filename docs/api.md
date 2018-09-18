@@ -40,6 +40,12 @@ API的默认返回值，当后端Cluster无可用Server的时候，Gateway将返
 * 聚合多个后端Cluster的响应，统一返回
 
   支持一个请求被同时分发到多个后端Cluster，并且为每一个后端Cluster返回的数据设置一个属性名，并且聚合所有的返回值作为一个JSON统一返回。例如：一个前端APP的页面需要显示用户账户信息以及用户的基本信息，可以使用这个特性，定制一个API`/api/users/(\d+)`，同时配置分发到2个后端Cluster，并且配置URL的重写规则为`/users/base/$1`和`/users/account/$1`，这样聚合2个信息返回。并且支持依赖转发，首先请求一个后端api得到返回的结果，并且使用返回结果的某一属性作为下次请求的参数。例如定制一个API`/api/users/(\d+)`，聚合后端2个服务`/users/base/$1`和`/users/account/$user.accountId`，那么可以设置`/users/account/$user.accountId`转发的`BatchIndex`为`1`，那么`/users/account/$user.accountId`会在`/users/base/$1`返回之后再转发，并且替换`$user.accountId`为返回的值。
+* 支持失败重试
+
+  可以设置`retryStrategy`指定根据http返回码重试请求，可以设置重试最大次数以及重试间隔。 
+* 支持API级别的超时时间覆盖全局设置
+
+  可以设置`ReadTimeout`和`WriteTimeout`来指定请求的读写超时时间，不设置默认使用全局设置。
 
 ## Perms（可选）
 设置访问这个API需要的权限，需要用户自己开发权限检查插件。
@@ -64,4 +70,10 @@ API的默认返回值，当后端Cluster无可用Server的时候，Gateway将返
 
 ## Position（可选）
 
-API匹配时按该值的升序匹配，即值越小优先级越高。默认值为0.
+API匹配时按该值的升序匹配，即值越小优先级越高。默认值为0。
+
+## Tags（可选）
+给API加上Tag标签，便于维护和检索。
+
+## WebSocketOptions（可选）
+websocket选项，设置该API为`websocket`，注意：`websocket特性还处于试验阶段，默认关闭，可以使用--websocket启用特性`。网关转发websocket的时候，`Origin`默认使用后端Server的地址，如果需要设置特殊值，可以指定`Origin`参数。

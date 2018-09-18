@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/fagongzi/gateway/pkg/util"
 )
 
 // Option proxy option
@@ -21,6 +23,10 @@ type Option struct {
 	LimitBufferWrite           int
 	LimitBytesBody             int
 	LimitBytesCaching          uint64
+
+	JWTCfgFile string
+
+	EnableWebSocket bool
 }
 
 // Cfg proxy config
@@ -34,6 +40,7 @@ type Cfg struct {
 	Filers    []*FilterSpec
 
 	Option *Option
+	Metric *util.MetricCfg
 }
 
 // AddFilter add a filter
